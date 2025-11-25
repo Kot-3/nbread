@@ -39,15 +39,17 @@ jobs:
           # 确保没有任何发布相关的环境变量
           PUBLISH: never
 
-      # 使用 GitHub Action 发布到 Releases
+      # 使用 GitHub CLI 发布到 Releases
       - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: daily-${{ steps.date.outputs.date }}
-          name: Daily Build ${{ steps.date.outputs.date }}
-          files: release/*.exe
-          prerelease: true # 标记为预发布版本
-          fail_on_unmatched_files: true
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 如果 release 已存在，先删除它和对应的 tag
+          gh release delete daily-${{ steps.date.outputs.date }} --cleanup-tag -y || true
+          
+          # 创建新的 release
+          gh release create daily-${{ steps.date.outputs.date }} release/*.exe \
+            --title "Daily Build ${{ steps.date.outputs.date }}" \
+            --prerelease \
+            --generate-notes

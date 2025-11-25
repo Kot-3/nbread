@@ -5,6 +5,9 @@ on:
     - cron: '0 0 * * *' # 每天 UTC 时间 00:00 运行 (北京时间 08:00)
   workflow_dispatch: # 允许手动触发
 
+permissions:
+  contents: write # 重要：给予写权限以便创建 Release
+
 jobs:
   build:
     name: Build Windows
@@ -23,14 +26,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # 获取当前日期作为版本标签
+      - name: Get current date
+        id: date
+        run: echo "date=$(Get-Date -Format 'yyyy.MM.dd')" >> $env:GITHUB_OUTPUT
+
       - name: Build application
         run: npm run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 禁用 electron-builder 的自动发布功能
+          EP_DRAFT: false
+          EP_PRE_RELEASE: false
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+      # 使用 GitHub Action 发布到 Releases
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: nbread-windows
-          path: release/*.exe
-          retention-days: 5
+          tag_name: daily-${{ steps.date.outputs.date }}
+          name: Daily Build ${{ steps.date.outputs.date }}
+          files: release/*.exe
+          prerelease: true # 标记为预发布版本
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

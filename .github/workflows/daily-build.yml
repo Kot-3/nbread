@@ -58,12 +58,17 @@ jobs:
           TAG_NAME="daily-${DATE}"
           RELEASE_TITLE="Daily Build ${DATE}"
           
-          if gh release view "$TAG_NAME" > /dev/null 2>&1; then
-            echo "Deleting existing release $TAG_NAME..."
-            gh release delete "$TAG_NAME" --cleanup-tag -y
-          fi
+          echo "Checking for existing release/tag..."
+          
+          # Try to delete existing release
+          gh release delete "$TAG_NAME" --cleanup-tag -y 2>/dev/null || true
+          
+          # Double check: Explicitly delete remote tag if it still exists
+          # This handles cases where gh release delete fails to clean up the tag completely
+          git push --delete origin "$TAG_NAME" 2>/dev/null || true
           
           echo "Creating release $TAG_NAME..."
+          # Create the release
           gh release create "$TAG_NAME" release/*.exe \
             --title "$RELEASE_TITLE" \
             --prerelease \

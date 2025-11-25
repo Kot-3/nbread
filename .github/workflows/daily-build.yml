@@ -26,21 +26,26 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Get current date
+      - name: Get current date and time
         id: date
         shell: bash
         run: |
-          DATE_STR=$(date +'%Y.%m.%d')
-          # Remove leading zeros to comply with SemVer (2024.01.01 -> 2024.1.1)
-          SEMVER_DATE=$(echo "$DATE_STR" | sed 's/\.0/./g')
+          # Get date with time to ensure uniqueness (YYYY.MM.DD-HHMM)
+          # Example: 2025.11.25-1755
+          DATE_STR=$(date +'%Y.%m.%d-%H%M')
+          
+          # Remove leading zeros from date parts for SemVer compliance, but keep time part as is
+          # This complex sed handles 2025.01.01-0900 -> 2025.1.1-0900
+          SEMVER_DATE=$(date +'%Y.%-m.%-d-%H%M')
+          
           echo "date=$DATE_STR" >> $GITHUB_OUTPUT
           echo "semver=$SEMVER_DATE" >> $GITHUB_OUTPUT
 
       - name: Set version
         shell: bash
         run: |
-          # Update package.json version to current date (CalVer)
-          # This ensures the built artifact has a unique name like NBRead-Setup-2024.1.1.exe
+          # Update package.json version
+          # Artifact name will be: NBRead-Setup-2025.11.25-1755.exe
           npm version "${{ steps.date.outputs.semver }}" --no-git-tag-version --allow-same-version --force
 
       - name: Build application
@@ -58,17 +63,9 @@ jobs:
           TAG_NAME="daily-${DATE}"
           RELEASE_TITLE="Daily Build ${DATE}"
           
-          echo "Checking for existing release/tag..."
-          
-          # Try to delete existing release
-          gh release delete "$TAG_NAME" --cleanup-tag -y 2>/dev/null || true
-          
-          # Double check: Explicitly delete remote tag if it still exists
-          # This handles cases where gh release delete fails to clean up the tag completely
-          git push --delete origin "$TAG_NAME" 2>/dev/null || true
-          
           echo "Creating release $TAG_NAME..."
-          # Create the release
+          # Create a new unique release directly
+          # No need to delete old ones because the timestamp makes it unique
           gh release create "$TAG_NAME" release/*.exe \
             --title "$RELEASE_TITLE" \
             --prerelease \

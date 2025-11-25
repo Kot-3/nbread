@@ -1,0 +1,70 @@
+name: Daily Build
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs at 00:00 UTC every day
+  workflow_dispatch: # Allows manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Get current date
+        id: date
+        shell: bash
+        run: |
+          DATE_STR=$(date +'%Y.%m.%d')
+          # Remove leading zeros to comply with SemVer (2024.01.01 -> 2024.1.1)
+          SEMVER_DATE=$(echo "$DATE_STR" | sed 's/\.0/./g')
+          echo "date=$DATE_STR" >> $GITHUB_OUTPUT
+          echo "semver=$SEMVER_DATE" >> $GITHUB_OUTPUT
+
+      - name: Set version
+        shell: bash
+        run: |
+          # Update package.json version to current date (CalVer)
+          # This ensures the built artifact has a unique name like NBRead-Setup-2024.1.1.exe
+          npm version "${{ steps.date.outputs.semver }}" --no-git-tag-version --allow-same-version --force
+
+      - name: Build application
+        shell: bash
+        run: |
+          npx vite build
+          npx electron-builder --win --publish never
+
+      - name: Create Release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DATE: ${{ steps.date.outputs.date }}
+        run: |
+          TAG_NAME="daily-${DATE}"
+          RELEASE_TITLE="Daily Build ${DATE}"
+          
+          if gh release view "$TAG_NAME" > /dev/null 2>&1; then
+            echo "Deleting existing release $TAG_NAME..."
+            gh release delete "$TAG_NAME" --cleanup-tag -y
+          fi
+          
+          echo "Creating release $TAG_NAME..."
+          gh release create "$TAG_NAME" release/*.exe \
+            --title "$RELEASE_TITLE" \
+            --prerelease \
+            --generate-notes

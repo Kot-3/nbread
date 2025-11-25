@@ -32,7 +32,12 @@ jobs:
         run: echo "date=$(Get-Date -Format 'yyyy.MM.dd')" >> $env:GITHUB_OUTPUT
 
       - name: Build application
-        run: vite build && electron-builder --publish never
+        run: |
+          npx vite build
+          npx electron-builder --win --publish never
+        env:
+          # 确保没有任何发布相关的环境变量
+          PUBLISH: never
 
       # 使用 GitHub Action 发布到 Releases
       - name: Create Release

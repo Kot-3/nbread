@@ -32,12 +32,7 @@ jobs:
         run: echo "date=$(Get-Date -Format 'yyyy.MM.dd')" >> $env:GITHUB_OUTPUT
 
       - name: Build application
-        run: npm run build
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # 禁用 electron-builder 的自动发布功能
-          EP_DRAFT: false
-          EP_PRE_RELEASE: false
+        run: vite build && electron-builder --publish never
 
       # 使用 GitHub Action 发布到 Releases
       - name: Create Release
